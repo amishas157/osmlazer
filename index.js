@@ -16,17 +16,26 @@ if (argv.filter && fs.existsSync(argv.filter)) {
 }
 
 var filter = ff(argv.filter);
+var nonProperties = ['lat', 'lon', 'coordinates', 'location'];
 
 stream.on('data', function (data) {
     var f;
     try {
         f = getFeature(data);
-        if (f && filter(f)) {
-            var fc = {
-                'type': 'FeatureCollection',
-                'features': [f]
-            };
-            console.log(JSON.stringify(fc));
+        Object.keys(data).map(function (key) {
+            if (nonProperties.indexOf(key) === -1) {
+                f.properties[key] = data[key];
+            }
+        });
+        if ((f['geometry']['type'] === 'MultiPolygon' && f['properties']['from_way'] === false) ||
+            (f['geometry']['type'] === 'LineString')) {
+            if (f && filter(f)) {
+                var fc = {
+                    'type': 'FeatureCollection',
+                    'features': [f]
+                };
+                console.log(JSON.stringify(fc));
+            }
         }
     } catch (e) {
         return;
