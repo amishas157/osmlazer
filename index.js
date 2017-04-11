@@ -29,12 +29,15 @@ stream.on('data', function (data) {
         });
         if ((f['geometry']['type'] === 'MultiPolygon' && f['properties']['from_way'] === false) ||
             (f['geometry']['type'] === 'LineString')) {
+            if (f['geometry']['type'] === 'MultiPolygon' && f['properties']['from_way'] === false) {
+                addRelationMembers(f, data);
+            }
             if (f && filter(f)) {
                 var fc = {
                     'type': 'FeatureCollection',
                     'features': [f]
                 };
-                console.log(JSON.stringify(fc));
+                // console.log(JSON.stringify(fc));
             }
         }
     } catch (e) {
@@ -56,4 +59,8 @@ function getFeature(d) {
 
     return feature;
 
+}
+
+function addRelationMembers(feature, data) {
+    console.log(data.members());
 }
