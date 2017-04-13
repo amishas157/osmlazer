@@ -15,38 +15,57 @@ if (argv.filter && fs.existsSync(argv.filter)) {
     process.exit();
 }
 
+if (argv.filterExclude && fs.existsSync(argv.filterExclude)) {
+    argv.filterExclude = JSON.parse(fs.readFileSync(argv.filterExclude));
+} else {
+    argv.filterExclude = false;
+    process.exit();
+}
+
 var filter = ff(argv.filter);
+var filterExclude = ff(argv.filterExclude);
 var nonProperties = ['lat', 'lon', 'coordinates', 'location'];
+
+fs.openSync('output.json', 'w');
+fs.openSync('relations.json', 'w');
+
+var relationIndex = {};
 
 stream.on('data', function (data) {
     var f;
-    try {
-        f = getFeature(data);
-        Object.keys(data).map(function (key) {
-            if (nonProperties.indexOf(key) === -1) {
-                f.properties[key] = data[key];
-            }
-        });
-        if ((f['geometry']['type'] === 'MultiPolygon' && f['properties']['from_way'] === false) ||
-            (f['geometry']['type'] === 'LineString')) {
-            if (f['geometry']['type'] === 'MultiPolygon' && f['properties']['from_way'] === false) {
-                addRelationMembers(f, data);
-            }
-            if (f && filter(f)) {
+
+    if (data.type === 'way') {
+        try {
+            f = getFeature(data);
+            Object.keys(data).map(function (key) {
+                if (nonProperties.indexOf(key) === -1) {
+                    f.properties[key] = data[key];
+                }
+            });
+            if (f && filter(f) && filterExclude(f)) {
                 var fc = {
                     'type': 'FeatureCollection',
                     'features': [f]
                 };
-                // console.log(JSON.stringify(fc));
+                fs.appendFileSync('output.json', JSON.stringify(fc) + '\n', 'utf8');
             }
+        } catch (e) {
+            return;
         }
-    } catch (e) {
-        return;
+    } else if (data.type === 'relation') {
+        data.members().forEach(function (member) {
+            if (member.type === 'w') {
+                if (!relationIndex.hasOwnProperty(member.ref)) {
+                    relationIndex[member.ref] = [];
+                }
+                relationIndex[member.ref].push(data.id);
+            }
+        });
     }
-
 });
 
 stream.on('end', function() {
+    fs.appendFileSync('relations.json', JSON.stringify(relationIndex, null, 2), 'utf8');
     process.stderr.write('done');
 });
 
@@ -62,5 +81,5 @@ function getFeature(d) {
 }
 
 function addRelationMembers(feature, data) {
-    console.log(data.members());
+    console.log(data.type);
 }
